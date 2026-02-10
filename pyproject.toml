@@ -1,0 +1,85 @@
+[build-system]
+requires = ["setuptools>=64", "wheel", "cython>=3.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyinla"
+version = "0.1.3"
+description = "Python interface for INLA (Integrated Nested Laplace Approximation) with bundled binaries."
+requires-python = ">=3.10"
+authors = [
+  { name = "pyINLA maintainers", email = "contact@pyinla.org" },
+]
+license = { text = "Proprietary" }
+dependencies = [
+  "numpy>=1.21,<2.1",
+  "pandas>=1.1,<3.0",
+  "scipy>=1.7,<2.0",
+]
+
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Cython",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "License :: Other/Proprietary License",
+]
+
+[project.scripts]
+pyinla-install = "pyinla.binary_manager:_cli_install"
+
+[project.optional-dependencies]
+fmesher = ["rpy2>=3.5"]
+dev = ["cython>=3.0", "pytest", "build", "twine"]
+
+[tool.setuptools]
+package-dir = {"" = "install"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["install"]
+include = ["pyinla", "pyinla.*"]
+
+[tool.setuptools.package-data]
+pyinla = [
+  # Binaries are downloaded on-demand, not bundled
+  # "bin/**/*",
+  "model_defs/**/*",
+  "fmesher/**/*",
+]
+
+[tool.cibuildwheel]
+# Build for Python 3.10-3.12 (dropped 3.9 - declining usage)
+build = "cp310-* cp311-* cp312-*"
+
+# Skip 32-bit builds, musl linux, and PyPy
+skip = "*-win32 *-manylinux_i686 *-musllinux* pp*"
+
+# Test the wheel - install dependencies from wheels first to avoid scipy build
+before-test = "pip install numpy pandas 'scipy<1.14'"
+test-command = "python -c \"import pyinla; print('pyinla imported successfully')\""
+
+[tool.cibuildwheel.linux]
+# Use manylinux2014 for broad compatibility
+manylinux-x86_64-image = "manylinux2014"
+manylinux-aarch64-image = "manylinux2014"
+
+# Install Cython before building
+before-build = "pip install cython>=3.0"
+
+[tool.cibuildwheel.macos]
+# Build for both Intel and Apple Silicon
+archs = ["x86_64", "arm64"]
+
+# Install Cython before building
+before-build = "pip install cython>=3.0"
+
+[tool.cibuildwheel.windows]
+# Build for 64-bit only (win32 skipped above)
+archs = ["AMD64"]
+
+# Install Cython before building
+before-build = "pip install cython>=3.0"
