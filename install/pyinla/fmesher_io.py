@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import os
 import struct
+import tempfile
 from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
