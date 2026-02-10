@@ -47,6 +47,33 @@ class BinaryManager:
         """Detect if 32 or 64-bit Python."""
         return "64" if sys.maxsize > 2**32 else "32"
 
+    def _detect_linux_distro(self) -> Optional[str]:
+        """Detect Linux distribution from /etc/os-release.
+
+        Returns:
+            A string like "Ubuntu-24.04" or None if detection fails.
+        """
+        try:
+            os_release = Path("/etc/os-release")
+            if not os_release.exists():
+                return None
+
+            info = {}
+            for line in os_release.read_text().splitlines():
+                if "=" in line:
+                    key, _, value = line.partition("=")
+                    info[key.strip()] = value.strip().strip('"')
+
+            name = info.get("NAME", "")
+            version_id = info.get("VERSION_ID", "")
+
+            if name and version_id:
+                # Build something like "Ubuntu-24.04" or "Fedora-43"
+                return f"{name}-{version_id}".replace(" ", "-").replace("Linux", "").strip("-")
+            return None
+        except Exception:
+            return None
+
     def detect_platform(self) -> str:
         """Detect current platform."""
         system = platform.system().lower()
@@ -92,8 +119,20 @@ class BinaryManager:
 
     def is_installed(self, platform_name: Optional[str] = None) -> bool:
         """Check if binary is already installed."""
+        if platform_name is None:
+            platform_name = self.detect_platform()
+
         binary_path = self.get_binary_path(platform_name)
-        return binary_path.exists() and binary_path.is_file()
+        if not (binary_path.exists() and binary_path.is_file()):
+            return False
+
+        # On Linux, the wrapper (.run) needs the actual binary too
+        if platform_name == "linux":
+            bin_dir = binary_path.parent
+            has_binary = (bin_dir / "inla.mkl").exists() or (bin_dir / "inla").exists()
+            return has_binary
+
+        return True
 
     def _fetch_linux_files_list(self) -> List[str]:
         """Fetch the FILES listing from R-INLA Linux builds server."""
@@ -224,7 +263,16 @@ class BinaryManager:
         if not binaries:
             raise RuntimeError("No Linux binaries found. Check your internet connection.")
 
-        # Filter by OS if specified
+        # Auto-detect distro if os_name not provided
+        if os_name is None:
+            detected = self._detect_linux_distro()
+            if detected:
+                auto_filtered = [b for b in binaries if detected.lower() in b['os'].lower()]
+                if auto_filtered:
+                    print(f"Auto-detected Linux distribution: {detected}")
+                    os_name = detected
+
+        # Filter by OS if specified (user-provided or auto-detected)
         if os_name:
             filtered = [b for b in binaries if os_name.lower() in b['os'].lower()]
             if not filtered:
@@ -315,6 +363,12 @@ class BinaryManager:
                     if dst_dir.exists():
                         shutil.rmtree(dst_dir)
                     shutil.copytree(item, dst_dir)
+
+            # Ensure inla.mkl exists (the .run wrapper script expects it)
+            inla_mkl = binary_path.parent / "inla.mkl"
+            inla_plain = binary_path.parent / "inla"
+            if not inla_mkl.exists() and inla_plain.exists():
+                inla_mkl.symlink_to(inla_plain.name)
 
             print(f"Installed {len(list(extracted_dir.iterdir()))} files to: {binary_path.parent}")
 
