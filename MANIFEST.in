@@ -15,11 +15,8 @@ recursive-include install/pyinla/model_defs *
 # Include fmesher package
 recursive-include install/pyinla/fmesher *
 
-# Include __init__.py (needed for package imports)
-include install/pyinla/__init__.py
-
-# Include binary_manager.py (for downloading binaries)
-include install/pyinla/binary_manager.py
+# Include all Python source files (fallback for platforms without pre-built wheels)
+recursive-include install/pyinla *.py
 
 # Exclude development files
 global-exclude *.pyc
